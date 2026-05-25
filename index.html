@@ -333,6 +333,40 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
 .lest-items li::before { content:'→ '; color:var(--accent); }
 .lest-range { display:inline-block; margin-top:8px; font-family:'JetBrains Mono',monospace; font-size:11px; padding:3px 10px; background:rgba(232,255,71,.1); color:var(--accent); border-radius:20px; }
 
+/* ── MONTHLY CALENDAR ── */
+.cal-month-nav { display:flex; align-items:center; justify-content:space-between; padding:4px 0 12px; }
+.cal-month-btn { background:var(--surface2); border:1px solid var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; padding:6px 14px; cursor:pointer; border-radius:20px; }
+.cal-month-label { font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:1px; color:var(--text); }
+
+.cal-grid-wrap { background:var(--surface); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:12px; }
+.cal-dow-row { display:grid; grid-template-columns:repeat(7,1fr); background:var(--surface2); border-bottom:1px solid var(--border); }
+.cal-dow { text-align:center; font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--muted); letter-spacing:1px; padding:8px 0; text-transform:uppercase; }
+.cal-dow.weekend { color:var(--accent2); }
+
+.cal-days-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:1px; background:var(--border); }
+.cal-cell { background:var(--surface); min-height:48px; padding:4px; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:2px; position:relative; }
+.cal-cell.other-month { background:var(--bg); }
+.cal-cell.today { background:rgba(232,255,71,0.05); }
+.cal-cell.today .cal-day-num { color:var(--accent); font-weight:700; }
+.cal-cell.trained { background:rgba(71,255,178,0.07); }
+.cal-cell.missed { background:rgba(255,107,53,0.05); }
+.cal-cell.rest-day { background:var(--surface); opacity:.5; }
+
+.cal-day-num { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted2); line-height:1; }
+.cal-dot { width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:11px; }
+.cal-dot.done { background:var(--grip); }
+.cal-dot.missed { background:rgba(255,107,53,0.25); color:var(--accent2); font-size:10px; }
+.cal-dot.rest { background:var(--surface2); color:var(--muted); font-size:10px; }
+.cal-dot.future { background:transparent; }
+
+.cal-legend { display:flex; gap:10px; flex-wrap:wrap; padding:8px 0 0; }
+.cal-legend-item { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--muted2); font-family:'JetBrains Mono',monospace; }
+.cal-legend-dot { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
+.cal-legend-dot.done { background:var(--grip); }
+.cal-legend-dot.missed { background:rgba(255,107,53,0.4); }
+.cal-legend-dot.rest { background:var(--surface2); border:1px solid var(--border); }
+.cal-legend-dot.today { background:rgba(232,255,71,0.3); border:1px solid var(--accent); }
+
 /* Section headers */
 .section-header { padding:16px 16px 8px; }
 .section-header h2 { font-family:'Bebas Neue',sans-serif; font-size:24px; letter-spacing:1px; }
@@ -428,9 +462,31 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
           <div class="streak-box"><span class="streak-v" id="p-week">0%</span><span class="streak-l">Cette semaine</span></div>
         </div>
 
-        <!-- Week calendar -->
-        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">CALENDRIER</div>
-        <div class="prog-history" id="prog-cal"></div>
+        <!-- Monthly calendar -->
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">📅 CALENDRIER MENSUEL</div>
+        <div class="cal-month-nav">
+          <button class="cal-month-btn" onclick="changeCalMonth(-1)">←</button>
+          <div class="cal-month-label" id="cal-month-label">MAI 2026</div>
+          <button class="cal-month-btn" onclick="changeCalMonth(1)">→</button>
+        </div>
+        <div class="cal-grid-wrap">
+          <div class="cal-dow-row">
+            <div class="cal-dow">LUN</div>
+            <div class="cal-dow">MAR</div>
+            <div class="cal-dow">MER</div>
+            <div class="cal-dow">JEU</div>
+            <div class="cal-dow">VEN</div>
+            <div class="cal-dow weekend">SAM</div>
+            <div class="cal-dow weekend">DIM</div>
+          </div>
+          <div class="cal-days-grid" id="cal-days-grid"></div>
+        </div>
+        <div class="cal-legend">
+          <div class="cal-legend-item"><div class="cal-legend-dot done"></div>Entraînement fait</div>
+          <div class="cal-legend-item"><div class="cal-legend-dot missed"></div>Manqué</div>
+          <div class="cal-legend-item"><div class="cal-legend-dot rest"></div>Repos</div>
+          <div class="cal-legend-item"><div class="cal-legend-dot today"></div>Aujourd'hui</div>
+        </div>
 
         <div class="divider"></div>
 
@@ -757,19 +813,118 @@ function buildMealList() {
   });
 }
 
+// ── MONTHLY CALENDAR ──
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth(); // 0-based
+
+function changeCalMonth(delta) {
+  calMonth += delta;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  buildProgCal();
+}
+
 function buildProgCal() {
-  const container = document.getElementById('prog-cal');
+  const container = document.getElementById('cal-days-grid');
+  const label = document.getElementById('cal-month-label');
+  if (!container) return;
+
+  const monthNames = ['JANVIER','FÉVRIER','MARS','AVRIL','MAI','JUIN','JUILLET','AOÛT','SEPTEMBRE','OCTOBRE','NOVEMBRE','DÉCEMBRE'];
+  label.textContent = `${monthNames[calMonth]} ${calYear}`;
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  // First day of month (0=Sun..6=Sat) → convert to Mon-based (0=Mon..6=Sun)
+  const firstDay = new Date(calYear, calMonth, 1);
+  let startDow = firstDay.getDay(); // 0=Sun
+  startDow = startDow === 0 ? 6 : startDow - 1; // Mon-based
+
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const daysInPrevMonth = new Date(calYear, calMonth, 0).getDate();
+
+  // Plan start date — we use week 1 = first Monday on or before state.startDate
+  // Simple approach: map absolute date → week number + day index
+  // Plan start = state.planStart (stored as ISO string), default = today if not set
+  if (!state.planStart) {
+    // Find last Monday on or before today
+    const d = new Date();
+    const dow = d.getDay() === 0 ? 6 : d.getDay() - 1;
+    d.setDate(d.getDate() - dow);
+    d.setHours(0,0,0,0);
+    state.planStart = d.toISOString().slice(0,10);
+    save();
+  }
+
+  const planStart = new Date(state.planStart);
+  planStart.setHours(0,0,0,0);
+
   container.innerHTML = '';
-  const names = ['L','M','ME','J','V','S','D'];
-  const emojis = ['💪','🦅','🔥','🌀','🦵','⚡','😴'];
-  DAYS.forEach((d, i) => {
-    const key = `w${currentWeek}-d${i}`;
-    const done = !!state.completedDays[key];
-    const el = document.createElement('div');
-    el.className = 'ph-day' + (done ? ' done' : '');
-    el.innerHTML = `<span class="ph-ico">${done ? '✅' : emojis[i]}</span><div class="ph-lbl">${names[i]}</div>`;
-    container.appendChild(el);
-  });
+
+  // Previous month padding cells
+  for (let i = 0; i < startDow; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell other-month';
+    const dayNum = daysInPrevMonth - startDow + 1 + i;
+    cell.innerHTML = `<div class="cal-day-num" style="opacity:.25">${dayNum}</div>`;
+    container.appendChild(cell);
+  }
+
+  // Current month cells
+  for (let d = 1; d <= daysInMonth; d++) {
+    const cellDate = new Date(calYear, calMonth, d);
+    cellDate.setHours(0,0,0,0);
+
+    const isToday = cellDate.getTime() === today.getTime();
+    const isFuture = cellDate > today;
+
+    // Day of week in plan (0=Mon ... 6=Sun)
+    const dow = cellDate.getDay() === 0 ? 6 : cellDate.getDay() - 1;
+    const isRestDay = dow === 6; // Sunday
+
+    // Figure out which week in the plan this date belongs to
+    const diffMs = cellDate - planStart;
+    const diffDays = Math.floor(diffMs / 86400000);
+    const weekNum = diffDays >= 0 ? Math.floor(diffDays / 7) + 1 : null;
+    const dayKey = weekNum ? `w${weekNum}-d${dow}` : null;
+    const isDone = dayKey ? !!state.completedDays[dayKey] : false;
+
+    // A day is "missed" if it's past, it was a training day, it's in the plan, and it's not done
+    const isTrainingDay = dow >= 0 && dow <= 5; // Mon–Sat
+    const isMissed = !isFuture && !isToday && !isDone && !isRestDay && weekNum && weekNum >= 1 && diffDays >= 0;
+
+    let cellClass = 'cal-cell';
+    if (isToday) cellClass += ' today';
+    else if (isDone) cellClass += ' trained';
+    else if (isMissed) cellClass += ' missed';
+    else if (isRestDay) cellClass += ' rest-day';
+
+    let dotHTML = '';
+    if (isDone) {
+      dotHTML = `<div class="cal-dot done">✓</div>`;
+    } else if (isMissed) {
+      dotHTML = `<div class="cal-dot missed">✗</div>`;
+    } else if (isRestDay && !isFuture) {
+      dotHTML = `<div class="cal-dot rest">😴</div>`;
+    } else if (!isFuture) {
+      dotHTML = `<div class="cal-dot future"></div>`;
+    }
+
+    const cell = document.createElement('div');
+    cell.className = cellClass;
+    cell.innerHTML = `<div class="cal-day-num">${d}</div>${dotHTML}`;
+    container.appendChild(cell);
+  }
+
+  // Fill remaining cells
+  const totalCells = startDow + daysInMonth;
+  const remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for (let i = 1; i <= remaining; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell other-month';
+    cell.innerHTML = `<div class="cal-day-num" style="opacity:.25">${i}</div>`;
+    container.appendChild(cell);
+  }
 }
 
 function buildHomeWeekStrip() {
